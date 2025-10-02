@@ -1,0 +1,23 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+
+# Temporary upload folders from your backend
+backend/temp_uploads/
+
+# Frontend dependencies and build output (for Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Common OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables (NEVER commit these)
+.env
+.env.*.local
