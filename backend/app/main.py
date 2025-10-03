@@ -1,4 +1,4 @@
-# backend/app/main.py (Final Version with Audio Endpoint)
+# backend/app/main.py (Final Version with Correct CORS)
 
 import os
 import shutil
@@ -9,22 +9,13 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from starlette.concurrency import run_in_threadpool
 
-# --- Correctly import all four analyzers ---
+# --- Import all four analyzers ---
 from app.analysis import text_analyzer, image_analyzer, video_analyzer, audio_analyzer
 
 # --- Pydantic Models for API Response Structure ---
-# (These are already correct from our previous steps)
 class SentimentResponse(BaseModel):
     label: str
     score: float
-
-class EvidenceItem(BaseModel):
-    source: str
-    label: Optional[str] = None
-    type: Optional[str] = None
-    text: str
-    span: Optional[Any] = None
-    score: Optional[float] = None
 
 class ScoreDetailItem(BaseModel):
     evidence: Dict[str, Any]
@@ -56,9 +47,19 @@ class VideoAnalysisResponse(BaseModel):
 
 # --- FastAPI App Initialization ---
 app = FastAPI(title="Digital Shadow Analyzer API")
+
+# --- THIS IS THE FIX ---
+# We are specifically allowing requests from our Next.js frontend's address.
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://127.0.0.1",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,7 +115,6 @@ async def analyze_video_endpoint(file: UploadFile = File(...)):
     finally:
         shutil.rmtree(temp_dir)
 
-# --- NEW AUDIO ENDPOINT ---
 @app.post("/analyze-audio/", response_model=VideoAnalysisResponse)
 async def analyze_audio_endpoint(file: UploadFile = File(...)):
     temp_dir = tempfile.mkdtemp()
