@@ -34,15 +34,31 @@ class TextAnalysisResponse(BaseModel):
     evidence: List[Dict[str, Any]]
     score: ScoreResponse
 
+class FusionAnalysisResponse(BaseModel):
+    fusion_score: float
+    modality_contributions: Dict[str, float]
+    primary_modality: Optional[str] = None
+    visual_embeddings_count: int = 0
+    text_embeddings_count: int = 0
+    audio_embeddings_count: int = 0
+    explanation: Optional[str] = None
+    contributing_factors: Optional[List[Dict[str, Any]]] = None
+    token_importance: Optional[Dict[str, List[float]]] = None
+    error: Optional[str] = None
+
 class ImageAnalysisResponse(BaseModel):
     metadata: Dict[str, Any]
     ocr_text: str
+    detected_documents: Optional[List[Dict[str, Any]]] = None
+    fusion_analysis: Optional[FusionAnalysisResponse] = None
     sentiment: Optional[SentimentResponse] = None
     evidence: Optional[List[Dict[str, Any]]] = None
     score: Optional[ScoreResponse] = None
 
 class VideoAnalysisResponse(BaseModel):
     transcribed_text: str
+    detected_documents: Optional[List[Dict[str, Any]]] = None
+    fusion_analysis: Optional[FusionAnalysisResponse] = None
     analysis: Optional[TextAnalysisResponse] = None
 
 # --- FastAPI App Initialization ---
