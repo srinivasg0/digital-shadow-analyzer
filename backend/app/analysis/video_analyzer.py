@@ -44,9 +44,14 @@ def detect_documents_in_frame(frame: np.ndarray) -> List[Dict[str, Any]]:
         # Run YOLOv8 inference on frame
         results = yolo_model(frame)
         
-        # Focus on document-related classes
-        document_related_classes = [73]  # book
-        confidence_threshold = 0.3
+        # Focus on document-related classes - expanded for better detection
+        document_related_classes = [
+            73,  # book - documents, IDs, cards
+            67,  # cell phone - may show sensitive info on screen
+            63,  # laptop - may show sensitive info on screen
+            0,   # person - faces are PII
+        ]
+        confidence_threshold = 0.25  # Lower threshold to catch more potential documents
         
         for result in results:
             boxes = result.boxes

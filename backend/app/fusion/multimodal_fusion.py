@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cv2
+import re
 from typing import List, Dict, Any, Optional, Tuple
 from sentence_transformers import SentenceTransformer
 from transformers import AutoModel, AutoTokenizer
@@ -266,6 +267,7 @@ class MultimodalFusionAnalyzer:
                                  audio_meta: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         Analyze multimodal content and return fusion results.
+        Uses heuristic-based scoring when fusion model is not trained.
         
         Args:
             visual_regions: List of cropped image regions
@@ -275,12 +277,8 @@ class MultimodalFusionAnalyzer:
         Returns:
             Dictionary containing fusion analysis results
         """
-        if self.fusion_model is None:
-            return {
-                "fusion_score": 0.0,
-                "modality_contributions": {"visual": 0.33, "text": 0.33, "audio": 0.34},
-                "error": "Fusion model not available"
-            }
+        # Use heuristic scoring instead of untrained model
+        use_heuristic = True  # Set to True until model is properly trained
         
         try:
             # Extract embeddings
@@ -295,6 +293,14 @@ class MultimodalFusionAnalyzer:
                     "modality_contributions": {"visual": 0.0, "text": 0.0, "audio": 0.0},
                     "error": "No content to analyze"
                 }
+            
+            # Use heuristic-based scoring for better accuracy
+            if use_heuristic:
+                return self._heuristic_fusion_analysis(
+                    visual_regions, text_content, audio_segments or [],
+                    visual_meta, text_meta, audio_meta,
+                    visual_embeddings, text_embeddings, audio_embeddings
+                )
             
             # Default metadata containers
             visual_meta = visual_meta or [{} for _ in range(len(visual_embeddings))]
@@ -439,6 +445,158 @@ class MultimodalFusionAnalyzer:
                 "modality_contributions": {"visual": 0.33, "text": 0.33, "audio": 0.34},
                 "error": str(e)
             }
+    
+    def _heuristic_fusion_analysis(self,
+                                   visual_regions: List[np.ndarray],
+                                   text_content: List[str],
+                                   audio_segments: List[np.ndarray],
+                                   visual_meta: Optional[List[Dict[str, Any]]],
+                                   text_meta: Optional[List[Dict[str, Any]]],
+                                   audio_meta: Optional[List[Dict[str, Any]]],
+                                   visual_embeddings: np.ndarray,
+                                   text_embeddings: np.ndarray,
+                                   audio_embeddings: np.ndarray) -> Dict[str, Any]:
+        """
+        Heuristic-based fusion scoring that provides more accurate results
+        than an untrained neural model.
+        """
+        # Calculate modality scores based on content presence and quality
+        visual_score = 0.0
+        text_score = 0.0
+        audio_score = 0.0
+        
+        # Visual scoring: based on number and confidence of detected regions
+        if len(visual_regions) > 0:
+            visual_score = min(1.0, len(visual_regions) * 0.25)  # More regions = higher risk
+            if visual_meta:
+                avg_confidence = np.mean([m.get('confidence', 0.5) for m in visual_meta if m.get('confidence')])
+                visual_score *= avg_confidence
+        
+        # Text scoring: based on content length and PII indicators
+        if len(text_content) > 0:
+            combined_text = " ".join(text_content)
+            text_length = len(combined_text)
+            
+            # Base score on text length (more text = potentially more exposure)
+            text_score = min(1.0, text_length / 500.0)  # Normalize to 500 chars
+            
+            # Check for PII patterns
+            pii_indicators = [
+                r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b',  # email
+                r'\b(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b',  # phone
+                r'\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b',  # aadhaar/card
+                r'\b[A-Z]{5}\d{4}[A-Z]\b',  # PAN
+            ]
+            
+            pii_count = 0
+            for pattern in pii_indicators:
+                pii_count += len(re.findall(pattern, combined_text))
+            
+            # Boost score based on PII findings
+            if pii_count > 0:
+                text_score = min(1.0, text_score + (pii_count * 0.15))
+        
+        # Audio scoring: based on segment count and duration
+        if len(audio_segments) > 0:
+            audio_score = min(1.0, len(audio_segments) * 0.2)
+        
+        # Calculate weighted fusion score
+        total_weight = 0
+        weighted_sum = 0
+        
+        if visual_score > 0:
+            weighted_sum += visual_score * 0.4  # Visual evidence is strong
+            total_weight += 0.4
+        if text_score > 0:
+            weighted_sum += text_score * 0.5  # Text is most reliable
+            total_weight += 0.5
+        if audio_score > 0:
+            weighted_sum += audio_score * 0.3
+            total_weight += 0.3
+        
+        # Calculate fusion score (0-1 range for consistency with frontend display)
+        fusion_score = weighted_sum / total_weight if total_weight > 0 else 0.0
+        
+        # Calculate modality contributions (normalized to sum to 1.0)
+        contributions_raw = {
+            "visual": visual_score * 0.4,
+            "text": text_score * 0.5,
+            "audio": audio_score * 0.3
+        }
+        total_contrib = sum(contributions_raw.values())
+        modality_contributions = {
+            k: v / total_contrib if total_contrib > 0 else 0.0
+            for k, v in contributions_raw.items()
+        }
+        
+        # Determine primary modality
+        primary_modality = max(modality_contributions, key=modality_contributions.get)
+        
+        # Boost fusion score if high-risk PII detected in text
+        if text_score > 0.7:  # High text risk
+            fusion_score = min(1.0, fusion_score * 1.2)  # Boost by 20%
+        
+        # Build contributing factors
+        contributing_factors = []
+        
+        # Add visual factors
+        if visual_meta:
+            for idx, meta in enumerate(visual_meta[:3]):  # Top 3
+                contributing_factors.append({
+                    "modality": "visual",
+                    "index": idx,
+                    "importance": float(visual_score / max(len(visual_meta), 1)),
+                    "region": {
+                        "bbox": meta.get("bbox"),
+                        "class_name": meta.get("class_name"),
+                        "confidence": meta.get("confidence"),
+                        "frame_timestamp": meta.get("frame_timestamp"),
+                    }
+                })
+        
+        # Add text factors
+        if text_meta:
+            for idx, meta in enumerate(text_meta[:3]):  # Top 3
+                contributing_factors.append({
+                    "modality": "text",
+                    "index": idx,
+                    "importance": float(text_score / max(len(text_meta), 1)),
+                    "text_span": meta.get("text_span"),
+                    "source": meta.get("source"),
+                })
+        
+        # Add audio factors
+        if audio_meta:
+            for idx, meta in enumerate(audio_meta[:3]):  # Top 3
+                contributing_factors.append({
+                    "modality": "audio",
+                    "index": idx,
+                    "importance": float(audio_score / max(len(audio_meta), 1)),
+                    "time_range": meta.get("time_range"),
+                })
+        
+        # Generate explanation
+        explanation_parts = []
+        if visual_score > 0.3:
+            explanation_parts.append(f"{len(visual_regions)} document/sensitive region(s) detected")
+        if text_score > 0.3:
+            explanation_parts.append("text content contains potential PII")
+        if audio_score > 0.3:
+            explanation_parts.append("audio contains spoken content")
+        
+        explanation = f"Privacy risk detected: {', '.join(explanation_parts) if explanation_parts else 'minimal exposure'}. "
+        explanation += f"The {primary_modality} modality contributes most significantly to the risk assessment."
+        
+        return {
+            "fusion_score": float(fusion_score),
+            "modality_contributions": modality_contributions,
+            "primary_modality": primary_modality,
+            "visual_embeddings_count": len(visual_embeddings),
+            "text_embeddings_count": len(text_embeddings),
+            "audio_embeddings_count": len(audio_embeddings),
+            "contributing_factors": contributing_factors,
+            "explanation": explanation,
+        }
 
 # Global instance for use across the application
 multimodal_analyzer = MultimodalFusionAnalyzer()

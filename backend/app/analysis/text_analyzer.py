@@ -24,15 +24,21 @@ nlp, hf_ner, sentiment_pipe = load_models()
 # --- PII Detection and Scoring ---
 # Using raw strings (r"...") to prevent SyntaxWarning
 PII_PATTERNS = {
-    "email": re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9._%-]+\.[A-Za-z]{2,}"),
-    "phone": re.compile(r"\b\d{6,15}\b"),
+    "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+    "phone": re.compile(r"\b(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b"),
     "url": re.compile(r"https?://[^\s]+"),
-    "creditcardlike": re.compile(r"\b\d{13,16}\b"),
+    "creditcard": re.compile(r"\b(?:\d{4}[-.\s]?){3}\d{4}\b"),
+    "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    "aadhaar": re.compile(r"\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b"),
+    "pan": re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b"),
+    "passport": re.compile(r"\b[A-Z]\d{7}\b"),
+    "ipaddress": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
 }
 WEIGHTS = {
-    "email": 25, "phone": 25, "creditcardlike": 40, "url": 10,
-    "addresslike": 20, "PERSON": 15, "GPE": 15, "LOC": 12, "ORG": 12,
-    "DATE": 8, "TIME": 6, "MONEY": 20, "defaultentity": 5,
+    "email": 30, "phone": 28, "creditcard": 50, "ssn": 50, "aadhaar": 45, "pan": 45,
+    "passport": 40, "url": 12, "ipaddress": 25,
+    "addresslike": 22, "PERSON": 20, "GPE": 15, "LOC": 15, "ORG": 12,
+    "DATE": 5, "TIME": 3, "MONEY": 18, "CARDINAL": 3, "defaultentity": 8,
 }
 
 # --- Evidence Extraction Functions ---
@@ -67,16 +73,50 @@ def extract_evidence(text: str) -> List[Dict[str, Any]]:
 def compute_exposure_score(evidence: List[Dict[str, Any]]) -> Dict[str, Any]:
     total = 0
     details = []
+    seen_items = set()  # Deduplication to avoid double-counting
+    
     for e in evidence:
+        # Create unique key for deduplication
+        text_val = e.get("text", "")
+        item_key = (text_val.lower(), e.get("type") or e.get("label") or "")
+        
+        if item_key in seen_items:
+            continue  # Skip duplicates
+        seen_items.add(item_key)
+        
         t = e.get("type") or e.get("label") or ""
         w = WEIGHTS.get(t, WEIGHTS.get(t.upper(), WEIGHTS["defaultentity"]))
         score_factor = float(e.get("score", 1.0))
-        text_len_factor = min(1.0, len(e.get("text", ""))/30.0 + 0.2)
+        
+        # Better text length factor: reward longer, more specific matches
+        text_len = len(text_val)
+        if text_len < 3:
+            text_len_factor = 0.3  # Very short matches get low weight
+        elif text_len < 10:
+            text_len_factor = 0.6
+        elif text_len < 30:
+            text_len_factor = 0.85
+        else:
+            text_len_factor = 1.0  # Full weight for substantial matches
+        
         contrib = w * score_factor * text_len_factor
-        details.append({"evidence": e, "weight": w, "factor": round(score_factor * text_len_factor, 2), "contribution": round(contrib, 2)})
+        details.append({
+            "evidence": e, 
+            "weight": w, 
+            "factor": round(score_factor * text_len_factor, 3), 
+            "contribution": round(contrib, 2)
+        })
         total += contrib
     
-    return {"rawscore": round(total, 2), "exposurescore": min(100, round(total)), "details": details}
+    # Normalize to 0-100 scale with better calibration
+    # Typical high-risk content should score 60-90, not exceed 100 easily
+    normalized_score = min(100, round(total * 0.8))  # Scale down slightly
+    
+    return {
+        "rawscore": round(total, 2), 
+        "exposurescore": normalized_score, 
+        "details": details
+    }
 
 # --- THIS IS THE CRUCIAL HELPER FUNCTION ---
 def convert_numpy_types(obj):

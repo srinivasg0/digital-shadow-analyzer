@@ -56,24 +56,14 @@ def detect_documents(image_path: str) -> List[Dict[str, Any]]:
         results = yolo_model(image)
         
         # COCO class IDs that might represent documents/cards
-        # 0: person, 1: bicycle, 2: car, 3: motorcycle, 4: airplane, 5: bus, 6: train, 7: truck
-        # 8: boat, 9: traffic light, 10: fire hydrant, 11: stop sign, 12: parking meter
-        # 13: bench, 14: bird, 15: cat, 16: dog, 17: horse, 18: sheep, 19: cow
-        # 20: elephant, 21: bear, 22: zebra, 23: giraffe, 24: backpack, 25: umbrella
-        # 26: handbag, 27: tie, 28: suitcase, 29: frisbee, 30: skis, 31: snowboard
-        # 32: sports ball, 33: kite, 34: baseball bat, 35: baseball glove, 36: skateboard
-        # 37: surfboard, 38: tennis racket, 39: bottle, 40: wine glass, 41: cup
-        # 42: fork, 43: knife, 44: spoon, 45: bowl, 46: banana, 47: apple
-        # 48: sandwich, 49: orange, 50: broccoli, 51: carrot, 52: hot dog, 53: pizza
-        # 54: donut, 55: cake, 56: chair, 57: couch, 58: potted plant, 59: bed
-        # 60: dining table, 61: toilet, 62: tv, 63: laptop, 64: mouse, 65: remote
-        # 66: keyboard, 67: cell phone, 68: microwave, 69: oven, 70: toaster
-        # 71: sink, 72: refrigerator, 73: book, 74: clock, 75: vase, 76: scissors
-        # 77: teddy bear, 78: hair drier, 79: toothbrush
-        
-        # Focus on objects that could be documents or cards
-        document_related_classes = [73]  # book - most likely to be documents
-        confidence_threshold = 0.3
+        # Expanded to include more potentially sensitive objects
+        document_related_classes = [
+            73,  # book - documents, IDs, cards
+            67,  # cell phone - may show sensitive info on screen
+            63,  # laptop - may show sensitive info on screen
+            0,   # person - faces are PII
+        ]
+        confidence_threshold = 0.25  # Lower threshold to catch more potential documents
         
         for result in results:
             boxes = result.boxes
@@ -111,10 +101,10 @@ def detect_documents(image_path: str) -> List[Dict[str, Any]]:
                         
                         detected_documents.append(detected_doc)
         
-        # Also check for any rectangular regions that might be documents
-        # This is a fallback for when YOLO doesn't detect documents but there might be cards/IDs
-        if len(detected_documents) == 0:
-            detected_documents = detect_rectangular_regions(image, image_path)
+        # Always check for rectangular regions (cards/IDs) in addition to YOLO detections
+        # This catches documents that YOLO might miss
+        rectangular_docs = detect_rectangular_regions(image, image_path)
+        detected_documents.extend(rectangular_docs)
             
     except Exception as e:
         print(f"Document detection failed: {e}")
