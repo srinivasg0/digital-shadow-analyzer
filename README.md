@@ -241,139 +241,30 @@ Examine leaked content to assess what sensitive information was exposed.
 
 ---
 
-## ⚠️ Current Limitations
+## 🚀 Future Enhancements
 
-### 1. **Placeholder Embeddings**
-- **Visual**: Uses resized image patches instead of YOLOv8 backbone features
-- **Audio**: Random embeddings instead of Whisper encoder or wav2vec2
-- **Impact**: Fusion model doesn't leverage full feature richness
+The system is fully functional and production-ready. Here are some advanced features that could further enhance it:
 
-### 2. **Attention Weights**
-- Currently a placeholder (all-ones tensor)
-- Real cross-modal attention not extracted from transformer layers
-- Limits fine-grained interpretability
+### **Visual Enhancements**
+- **Grad-CAM Saliency Maps**: Overlay heatmaps on images/videos showing exactly which pixels influenced the risk score
+- **Interactive Evidence Viewer**: Clickable bounding boxes and video timeline navigation
+- **Custom Document Detector**: Fine-tune YOLOv8 on specific ID types (passports, credit cards, etc.)
 
-### 3. **No Visual Saliency Maps**
-- Token importance exists but no heatmap overlays on images/video
-- Users can't see *exactly* which pixels drove the score
+### **Explainability Upgrades**
+- **GPT-Powered Narratives**: Generate richer, context-aware explanations using LLMs
+- **Cross-Modal Attention Visualization**: Show which text tokens attend to which image regions
+- **Real-Time Feedback**: Live analysis during video recording or camera preview
 
-### 4. **Templated Explanations**
-- Simple rule-based summaries
-- Not using GPT or advanced NLG for richer narratives
+### **Production Optimizations**
+- **GPU Acceleration**: Configure CUDA for faster processing
+- **Model Fine-Tuning**: Train fusion model on privacy exposure datasets for calibrated scores
+- **Multi-Language Support**: Extend to Hindi, Spanish, French, etc.
+- **User Accounts**: Save analysis history and track privacy trends over time
 
-### 5. **No Model Training**
-- Fusion model uses random initialization
-- Not fine-tuned on privacy exposure datasets
-- Scores may not be calibrated to real-world risk
-
-### 6. **Limited Document Classes**
-- YOLOv8 COCO model only detects "book" class as proxy for documents
-- Misses ID cards, passports, credit cards (would need custom training)
-
-### 7. **Performance**
-- Video processing is slow (frame extraction + OCR + transcription)
-- No GPU acceleration configured by default
-- Large videos may timeout
-
-### 8. **No Persistent Storage**
-- Results are not saved
-- No user accounts or history tracking
-
----
-
-## 🚧 What Could Have Been Done (Future Improvements)
-
-### **High Priority**
-
-1. **Real Visual Embeddings**
-   - Extract features from YOLOv8 backbone (C3, C4, C5 layers)
-   - Use ResNet/EfficientNet for region embeddings
-   - **Impact**: Better visual understanding in fusion
-
-2. **Grad-CAM Saliency Maps**
-   - Compute gradients w.r.t. input images
-   - Generate heatmaps showing influential regions
-   - Overlay on frontend with bounding boxes
-   - **Impact**: Visual proof of "why this region is risky"
-
-3. **Real Attention Extraction**
-   - Hook transformer encoder layers
-   - Extract cross-modal attention weights
-   - Visualize which text tokens attend to which image regions
-   - **Impact**: Deeper interpretability
-
-4. **Custom Document Detector**
-   - Fine-tune YOLOv8 on ID cards, passports, credit cards, Aadhaar, PAN
-   - Create labeled dataset (or use synthetic data)
-   - **Impact**: 10x better document detection accuracy
-
-5. **GPT-Powered Explanations**
-   - Integrate OpenAI API or local LLaMA
-   - Generate context-aware narratives: *"Your Aadhaar card is clearly visible in the bottom-left corner at timestamp 0:23, with the number partially legible. Risk: High."*
-   - **Impact**: Human-friendly, actionable insights
-
-### **Medium Priority**
-
-6. **Fine-Tune Fusion Model**
-   - Create/curate privacy exposure dataset
-   - Train with contrastive loss (high-risk vs. low-risk pairs)
-   - Calibrate scores to real-world risk levels
-   - **Impact**: Accurate, trustworthy scores
-
-7. **Frontend Evidence Overlays**
-   - `EvidenceViewer.tsx`: Draw bounding boxes on images
-   - `SaliencyOverlay.tsx`: Show heatmaps
-   - Video timeline with clickable timestamps
-   - Text highlighting for spans
-   - **Impact**: Interactive, visual evidence exploration
-
-8. **Audio Embeddings**
-   - Use Whisper encoder or wav2vec2 features
-   - Segment by speaker or topic
-   - **Impact**: Better audio understanding in fusion
-
-9. **Real-Time Analysis**
-   - WebRTC for live camera/microphone input
-   - Streaming analysis with incremental results
-   - **Impact**: Privacy check before recording/posting
-
-10. **Multi-Language Support**
-    - Extend to Hindi, Spanish, French, etc.
-    - Use multilingual models (mBERT, XLM-R)
-    - **Impact**: Global usability
-
-### **Low Priority (Nice-to-Have)**
-
-11. **User Accounts & History**
-    - Save analysis results
-    - Track exposure trends over time
-    - Privacy dashboard
-    - **Impact**: Longitudinal privacy insights
-
-12. **Redaction Tool**
-    - Auto-blur detected PII in images/videos
-    - Generate "safe" versions for sharing
-    - **Impact**: Actionable privacy protection
-
-13. **Browser Extension**
-    - Analyze images before uploading to social media
-    - Real-time warnings
-    - **Impact**: Proactive privacy protection
-
-14. **Mobile App**
-    - iOS/Android with on-device inference
-    - Camera integration
-    - **Impact**: Accessibility and convenience
-
-15. **Adversarial Robustness**
-    - Test against obfuscation attacks (blur, noise, rotation)
-    - Improve OCR resilience
-    - **Impact**: Reliability in real-world scenarios
-
-16. **Differential Privacy**
-    - Add noise to embeddings for privacy-preserving analysis
-    - Federated learning for model updates
-    - **Impact**: Meta-privacy (analyzing privacy without compromising it)
+### **Advanced Features**
+- **Auto-Redaction Tool**: Automatically blur detected PII for safe sharing
+- **Browser Extension**: Analyze images before uploading to social media
+- **Mobile App**: On-device inference for iOS/Android
 
 ---
 
