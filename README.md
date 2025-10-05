@@ -9,16 +9,49 @@ A cutting-edge privacy analysis tool that uses computer vision, NLP, speech reco
 ## 📸 Examples
 
 ### Example 1: Text Analysis
-![Text Analysis Example](./screenshots/Screenshot%20(581).png)
+![Text Analysis - Input](./screenshots/Screenshot%20(581).png)
 *Text analysis showing **Exposure Score: 100** with comprehensive PII detection including email, phone numbers, credit card, Aadhaar, addresses, and personal information. Sentiment analysis shows NEGATIVE with 99.4% confidence.*
 
 ### Example 2: Image Analysis with Document Detection
-![Image Analysis Example](./screenshots/Screenshot%20(582).png)
-*Image analysis with **Fusion Score: 80.9%** (High Risk). Detected multiple documents with OCR text extraction. Modality contributions: Visual (17.6%), Text (82.4%), Audio (0.0%). Shows detected documents with bounding boxes and confidence scores.*
+![Image Analysis - Upload](./screenshots/Screenshot%20(582).png)
+*Image analysis interface showing file upload for document detection.*
+
+![Image Analysis - Detected Documents](./screenshots/Screenshot%20(583).png)
+*Detected documents with **Fusion Score: 80.9%** (High Risk). Multiple document regions identified with OCR text extraction. Modality contributions: Visual (17.6%), Text (82.4%), Audio (0.0%).*
 
 ### Example 3: Video Analysis (Multimodal)
-![Video Analysis Example](./screenshots/Screenshot%20(584).png)
-*Video analysis demonstrating full multimodal fusion with **Fusion Score: 100.0%** (Critical Risk). Detected 15+ person instances across video frames with timestamps. Modality contributions: Visual (31.6%), Text (42.8%), Audio (25.7%). Comprehensive evidence extraction from all modalities.*
+![Video Analysis - Upload](./screenshots/Screenshot%20(584).png)
+*Video analysis interface showing detected documents across multiple frames with timestamps.*
+
+![Video Analysis - Fusion Score](./screenshots/Screenshot%20(585).png)
+*Multimodal fusion analysis with **Fusion Score: 100.0%** (Critical Risk). Detected 15+ person instances across video frames. Modality contributions: Visual (31.6%), Text (42.8%), Audio (25.7%).*
+
+![Video Analysis - Detailed Evidence](./screenshots/Screenshot%20(586).png)
+*Comprehensive evidence breakdown showing all detected PII including names, locations, dates, organizations, and sentiment analysis (POSITIVE with 100% confidence).*
+
+---
+
+## 📹 Submissions
+
+### **Demo Video**
+🎥 **Watch the complete demonstration video:** [Digital Shadow Analyzer Demo](https://drive.google.com/file/d/1HidJIMABdOQwA_lR6aKF4pQcOEn9Oeum/view?usp=sharing)
+
+The video showcases:
+- Complete system walkthrough
+- Text analysis with PII detection
+- Image analysis with document detection
+- Video analysis with multimodal fusion
+- Real-time exposure scoring and explainability features
+
+### **GitHub Repository**
+📦 **Source Code:** [https://github.com/srinivasg0/digital-shadow-analyzer](https://github.com/srinivasg0/digital-shadow-analyzer)
+
+### **Project Resources**
+- **README.md**: Comprehensive project documentation (this file)
+- **requirements.txt**: All Python dependencies with versions
+- **API Documentation**: Complete endpoint specifications (see API Endpoints section)
+- **Setup Guide**: Step-by-step installation instructions (see Getting Started section)
+- **Screenshots**: Visual examples in `/screenshots` directory
 
 ---
 
@@ -70,9 +103,28 @@ A cutting-edge privacy analysis tool that uses computer vision, NLP, speech reco
 
 ### Prerequisites
 
-- **Python 3.8+**
+- **Python 3.8+** (Python 3.9 or 3.10 recommended)
 - **Node.js 16+** and npm/yarn
 - **Git**
+- **FFmpeg** (required for video/audio processing)
+  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt-get install ffmpeg`
+
+### ⚠️ Special Setup Notes
+
+**Important:** This project requires several large AI models to be downloaded on first run:
+- **YOLOv8** (~6 MB): Downloads automatically
+- **Whisper Base** (~140 MB): Downloads automatically via Hugging Face
+- **BERT NER** (~400 MB): Downloads automatically via Hugging Face
+- **Sentence Transformers** (~80 MB): Downloads automatically
+
+**First-time setup may take 10-15 minutes** depending on your internet connection.
+
+**System Requirements:**
+- **RAM**: Minimum 8GB (16GB recommended for video processing)
+- **Storage**: At least 2GB free space for models
+- **GPU**: Optional but recommended (CUDA-compatible NVIDIA GPU for faster processing)
 
 ### Backend Setup
 
@@ -231,7 +283,7 @@ digital-shadow-analyzer/
 
 ---
 
-## 🧪 Example Use Cases
+## 🧪 StakeHolders
 
 ### 1. Social Media Privacy Check
 Upload a photo before posting to detect visible ID cards, documents, or sensitive text in the background.
@@ -324,6 +376,81 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 ---
 
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### **1. FFmpeg Not Found Error**
+```
+Error: ffmpeg not found
+```
+**Solution:** Install FFmpeg and add it to your system PATH:
+- Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html), extract, and add `bin` folder to PATH
+- macOS: `brew install ffmpeg`
+- Linux: `sudo apt-get install ffmpeg`
+
+#### **2. spaCy Model Not Found**
+```
+OSError: [E050] Can't find model 'en_core_web_sm'
+```
+**Solution:** Download the spaCy model manually:
+```bash
+python -m spacy download en_core_web_sm
+```
+
+#### **3. CUDA Out of Memory (GPU)**
+```
+RuntimeError: CUDA out of memory
+```
+**Solution:** 
+- Reduce `max_frames` in `backend/app/analysis/video_analyzer.py` (line ~20)
+- Process shorter videos
+- Use CPU instead of GPU (automatic fallback)
+
+#### **4. Model Download Failures**
+```
+ConnectionError: Failed to download model
+```
+**Solution:**
+- Check your internet connection
+- Models download automatically on first run (may take 10-15 minutes)
+- Retry after ensuring stable connection
+- Check firewall settings for Hugging Face Hub access
+
+#### **5. CORS Errors in Frontend**
+```
+Access to fetch at 'http://localhost:8000' has been blocked by CORS policy
+```
+**Solution:**
+- Ensure backend is running on port 8000
+- Frontend must run on port 3000
+- Check `origins` list in `backend/app/main.py` (lines 69-74)
+
+#### **6. Port Already in Use**
+```
+ERROR: [Errno 48] Address already in use
+```
+**Solution:**
+- Backend: Change port in uvicorn command: `--port 8001`
+- Frontend: Change port in `package.json` or use `PORT=3001 npm run dev`
+
+#### **7. Import Errors After Installation**
+```
+ModuleNotFoundError: No module named 'easyocr'
+```
+**Solution:**
+- Ensure virtual environment is activated
+- Reinstall dependencies: `pip install -r requirements.txt`
+- Check Python version (3.8+ required)
+
+#### **8. Video Processing Takes Too Long**
+**Solution:**
+- Reduce `max_frames` in `video_analyzer.py` (default: 15 → try 5-10)
+- Use shorter test videos (< 30 seconds)
+- Enable GPU acceleration if available
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Areas for improvement:
@@ -368,6 +495,54 @@ In an era of oversharing and data breaches, **privacy awareness is critical**. T
 - **Trust** AI explanations instead of black-box scores
 
 **Digital Shadow Analyzer transforms privacy analysis from opaque to transparent, from reactive to proactive.**
+
+---
+
+## 📋 Quick Reference
+
+### **Key Commands**
+
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### **API Endpoints**
+- `POST /analyze-text/` - Text PII detection
+- `POST /analyze-image/` - Image document detection + OCR
+- `POST /analyze-video/` - Video multimodal analysis
+- `POST /analyze-audio/` - Audio transcription + PII detection
+
+### **Key Files**
+- `backend/app/main.py` - FastAPI endpoints
+- `backend/app/analysis/text_analyzer.py` - Text PII detection
+- `backend/app/analysis/image_analyzer.py` - YOLOv8 + OCR
+- `backend/app/analysis/video_analyzer.py` - Video processing
+- `backend/app/fusion/multimodal_fusion.py` - Transformer fusion model
+- `backend/requirements.txt` - Python dependencies
+- `frontend/src/components/AnalysisTabs.tsx` - Main UI
+
+### **Submission Checklist**
+- ✅ Public GitHub repository
+- ✅ Comprehensive README.md with setup instructions
+- ✅ requirements.txt with all dependencies and versions
+- ✅ "Submissions" section with video link
+- ✅ Special setup notes for model downloads
+- ✅ Troubleshooting guide
+- ✅ API documentation
+- ✅ Screenshots and examples
 
 ---
 
