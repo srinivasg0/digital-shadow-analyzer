@@ -32,10 +32,44 @@ interface TextAnalysisResponse {
   score: { rawscore: number; exposurescore: number };
 }
 
+interface FusionAnalysisResponse {
+  fusion_score: number;
+  modality_contributions: {
+    visual: number;
+    text: number;
+    audio: number;
+  };
+  primary_modality?: string;
+  visual_embeddings_count: number;
+  text_embeddings_count: number;
+  audio_embeddings_count: number;
+  explanation?: string;
+  contributing_factors?: Array<{
+    modality: 'visual' | 'text' | 'audio';
+    index: number;
+    importance: number;
+    region?: { bbox?: number[]; class_name?: string; confidence?: number; frame_timestamp?: number };
+    text_span?: [number, number];
+    source?: string;
+    time_range?: [number, number];
+  }>;
+  token_importance?: { visual?: number[]; text?: number[]; audio?: number[] };
+  error?: string;
+}
+
 interface FileAnalysisResponse {
   analysis: TextAnalysisResponse | null;
   ocr_text?: string;
   transcribed_text?: string;
+  detected_documents?: Array<{
+    class_id: number;
+    class_name: string;
+    confidence: number;
+    bbox: number[];
+    ocr_text: string;
+    frame_timestamp?: number;
+  }>;
+  fusion_analysis?: FusionAnalysisResponse;
 }
 
 const StyledTabPanel = styled('div')({ padding: 24 });
@@ -105,6 +139,16 @@ export default function AnalysisTabs() {
         ? `OCR Text: ${result.ocr_text}`
         : null;
 
+    // Check for detected documents
+    const hasDetectedDocuments = 'detected_documents' in result && 
+      result.detected_documents && 
+      result.detected_documents.length > 0;
+
+    // Check for fusion analysis
+    const hasFusionAnalysis = 'fusion_analysis' in result && 
+      result.fusion_analysis && 
+      !result.fusion_analysis.error;
+
     if (!analysisData) {
       return (
         <>
@@ -115,6 +159,99 @@ export default function AnalysisTabs() {
             >
               {extraText}
             </Typography>
+          )}
+          {hasDetectedDocuments && (
+            <>
+              <Typography variant="h6" sx={{ mt: 2 }}>Detected Documents:</Typography>
+              <List dense>
+                {result.detected_documents!.map((doc, idx) => (
+                  <ListItem key={idx}>
+                    <ListItemText
+                      primary={`Type: ${doc.class_name} | Confidence: ${(doc.confidence * 100).toFixed(1)}%`}
+                      secondary={
+                        <Box>
+                          <Typography variant="body2">
+                            OCR: {doc.ocr_text || 'No text detected'}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            Box: [{doc.bbox.map(x => x.toFixed(0)).join(', ')}]
+                            {doc.frame_timestamp !== undefined && ` | Time: ${doc.frame_timestamp.toFixed(1)}s`}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
+          {hasFusionAnalysis && (
+            <>
+              <Typography variant="h6" sx={{ mt: 2 }}>Multimodal Fusion Analysis:</Typography>
+              <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                <Typography variant="h4" color="primary" sx={{ textAlign: 'center', mb: 2 }}>
+                  Fusion Score: {(result.fusion_analysis!.fusion_score * 100).toFixed(1)}%
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 2, textAlign: 'center' }}>
+                  Primary Modality: <strong>{result.fusion_analysis!.primary_modality}</strong>
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" color="secondary">
+                      {(result.fusion_analysis!.modality_contributions.visual * 100).toFixed(1)}%
+                    </Typography>
+                    <Typography variant="body2">Visual</Typography>
+                    <Typography variant="caption">
+                      ({result.fusion_analysis!.visual_embeddings_count} regions)
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" color="secondary">
+                      {(result.fusion_analysis!.modality_contributions.text * 100).toFixed(1)}%
+                    </Typography>
+                    <Typography variant="body2">Text</Typography>
+                    <Typography variant="caption">
+                      ({result.fusion_analysis!.text_embeddings_count} texts)
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" color="secondary">
+                      {(result.fusion_analysis!.modality_contributions.audio * 100).toFixed(1)}%
+                    </Typography>
+                    <Typography variant="body2">Audio</Typography>
+                    <Typography variant="caption">
+                      ({result.fusion_analysis!.audio_embeddings_count} segments)
+                    </Typography>
+                  </Box>
+                </Box>
+                {result.fusion_analysis!.explanation && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    <strong>Explanation:</strong> {result.fusion_analysis!.explanation}
+                  </Typography>
+                )}
+                {result.fusion_analysis!.contributing_factors && result.fusion_analysis!.contributing_factors.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle1">Top Contributing Evidence</Typography>
+                    <List dense>
+                      {result.fusion_analysis!.contributing_factors.slice(0, 5).map((f, i) => (
+                        <ListItem key={i}>
+                          <ListItemText
+                            primary={`${f.modality.toUpperCase()} • importance ${(f.importance * 100).toFixed(1)}%`}
+                            secondary={
+                              f.modality === 'visual'
+                                ? `Box: [${f.region?.bbox?.map(x => x.toFixed(0)).join(', ')}]` + (f.region?.frame_timestamp !== undefined ? ` | Time: ${f.region?.frame_timestamp?.toFixed(1)}s` : '')
+                                : f.modality === 'text'
+                                ? `${f.source || 'text'} span: [${f.text_span ? `${f.text_span[0]}, ${f.text_span[1]}` : 'n/a'}]`
+                                : `Time: ${f.time_range ? `${f.time_range[0].toFixed(1)}s - ${f.time_range[1].toFixed(1)}s` : 'n/a'}`
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+              </Paper>
+            </>
           )}
           <Typography sx={{ mt: 2 }}>
             Analysis could not be performed on the text content.
@@ -133,6 +270,76 @@ export default function AnalysisTabs() {
             {extraText}
           </Typography>
         )}
+        
+        {hasDetectedDocuments && (
+          <>
+            <Typography variant="h6" sx={{ mt: 2 }}>Detected Documents:</Typography>
+            <List dense>
+              {result.detected_documents!.map((doc, idx) => (
+                <ListItem key={idx}>
+                  <ListItemText
+                    primary={`Type: ${doc.class_name} | Confidence: ${(doc.confidence * 100).toFixed(1)}%`}
+                    secondary={
+                      <Box>
+                        <Typography variant="body2">
+                          OCR: {doc.ocr_text || 'No text detected'}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          Box: [{doc.bbox.map(x => x.toFixed(0)).join(', ')}]
+                          {doc.frame_timestamp !== undefined && ` | Time: ${doc.frame_timestamp.toFixed(1)}s`}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
+        
+        {hasFusionAnalysis && (
+          <>
+            <Typography variant="h6" sx={{ mt: 2 }}>Multimodal Fusion Analysis:</Typography>
+            <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+              <Typography variant="h4" color="primary" sx={{ textAlign: 'center', mb: 2 }}>
+                Fusion Score: {(result.fusion_analysis!.fusion_score * 100).toFixed(1)}%
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2, textAlign: 'center' }}>
+                Primary Modality: <strong>{result.fusion_analysis!.primary_modality}</strong>
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="secondary">
+                    {(result.fusion_analysis!.modality_contributions.visual * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="body2">Visual</Typography>
+                  <Typography variant="caption">
+                    ({result.fusion_analysis!.visual_embeddings_count} regions)
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="secondary">
+                    {(result.fusion_analysis!.modality_contributions.text * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="body2">Text</Typography>
+                  <Typography variant="caption">
+                    ({result.fusion_analysis!.text_embeddings_count} texts)
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="secondary">
+                    {(result.fusion_analysis!.modality_contributions.audio * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="body2">Audio</Typography>
+                  <Typography variant="caption">
+                    ({result.fusion_analysis!.audio_embeddings_count} segments)
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
+          </>
+        )}
+        
         <Grid container spacing={2}>
           <Grid item xs={12} md={4}>
             <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
